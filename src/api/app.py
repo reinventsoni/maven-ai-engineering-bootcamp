@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from openai import OpenAI
 from groq import Groq
 from google import genai
+from google.genai.types import GenerateContentConfig
 from src.api.core.config import config
 
 import uvicorn
@@ -15,7 +16,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-def run_llm(provider, model_name, messages, max_tokens=500):
+def run_llm(provider, model_name, messages, temperature=0.5, max_output_tokens=500):
     if provider == "OpenAI":
         client = OpenAI(api_key=config.OPENAI_API_KEY)
     elif provider == "Groq":
@@ -26,12 +27,15 @@ def run_llm(provider, model_name, messages, max_tokens=500):
     if provider == "Google":
         return client.models.generate_content(
             model=model_name,
-            contents=[message["content"] for message in messages]).text
+            contents=[message["content"] for message in messages],
+            config = GenerateContentConfig(temperature=temperature, max_output_tokens=max_output_tokens)
+            ).text
     else:
         return client.chat.completions.create(
             model=model_name,
             messages=messages,
-            max_tokens=max_tokens
+            temperature=temperature,
+            max_completion_tokens=max_output_tokens
         ).choices[0].message.content
 
 
@@ -39,6 +43,8 @@ class ChatRequest(BaseModel):
     provider: str
     model_name: str
     messages: list[dict]
+    temperature: float
+    max_output_tokens: int
 
 class ChatResponse(BaseModel):
     message: str
@@ -47,5 +53,5 @@ class ChatResponse(BaseModel):
 app = FastAPI()
 @app.post("/chat")
 def chat(request: Request, payload: ChatRequest) -> ChatResponse:
-    result = run_llm(payload.provider, payload.model_name, payload.messages)
+    result = run_llm(payload.provider, payload.model_name, payload.messages, payload.temperature, payload.max_output_tokens)
     return ChatResponse(message=result)
