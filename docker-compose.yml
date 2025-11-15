@@ -5,8 +5,17 @@ services:
       dockerfile: Dockerfile.streamlit
     ports:
       - 8501:8501
+    restart: unless-stopped
+    volumes:
+      - ./src/chatbot_ui:/app/src/chatbot_ui
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.llmapi
+    ports:
+      - 8000:8000
     env_file:
       - .env
     restart: unless-stopped
     volumes:
-      - ./src/chatbot_ui:/app/src/chatbot_ui
+      - ./src/api:/app/src/api

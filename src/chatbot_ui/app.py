@@ -1,12 +1,8 @@
 import streamlit as st
 import requests
-from core.config import config
+from src.chatbot_ui.core.config import config
 
-from openai import OpenAI
-from google import genai
-from groq import Groq
 
-# Let's create a Sidebar for Provider and Model Selection
 with st.sidebar:
     st.title("Chatbot Settigns")
 
@@ -22,27 +18,35 @@ with st.sidebar:
     st.session_state.provider = provider
     st.session_state.model_name = model_name
 
-
-if st.session_state.provider == "OpenAI":
-    client = OpenAI(api_key=config.OPENAI_API_KEY)
-elif st.session_state.provider == "Google":
-    client = genai.Client(api_key=config.GOOGLE_API_KEY)
-else:
-    client = Groq(api_key=config.GROQ_API_KEY)
-
-def run_llm(client, messages, max_tokens=500):
-    if st.session_state.provider == "Google":
-        response = client.models.generate_content(
-            model=st.session_state.model_name,
-            contents=[message["content"] for message in messages])
-        return response.text    
-    else:
-        response = client.chat.completions.create(
-            model=st.session_state.model_name,
-            messages=messages,
-            max_tokens=max_tokens
-        )
-        return response.choices[0].message.content
+def api_call(method, url, **kwargs):
+    def _show_error_popup(message):
+        """Show Error Message as PopUp in the Top-Right Corner"""
+        st.session_state["error_popup"] = {
+            "visible": True,
+            "message": message,    
+        }
+    try:
+        response = getattr(requests, method)(url, **kwargs)
+        try:
+            response_data = response.json()
+        except requests.exceptions.JSONDecodeError:
+            response_data = {"message": "Invalid response format from server"}
+        if response.ok:
+            return True, response_data
+        return False, response_data
+    except requests.exceptions.ConnectionError as e:
+        _show_error_popup(f"Connection error, please check your network connection")
+        return False, {"message": "Connection Error"}
+    except requests.exceptions.Timeout as e:
+        _show_error_popup(f"Timeout error, please try again later")
+        return False, {"message": "Timeout Error"}
+    except requests.exceptions.HTTPError as e:
+        _show_error_popup(f"HTTP error, please check your request")
+        return False, {"message": "HTTP Error"}
+    except requests.exceptions.Exception as e:
+        _show_error_popup(f"An unexpected error occurred")
+        return False, {"message": "Unexpected Error"}
+    
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
@@ -59,6 +63,12 @@ if prompt := st.chat_input("Hello! How can I assist you today?"):
         st.markdown(prompt)
     
     with st.chat_message("assistant"):
-        output = run_llm(client, st.session_state.messages)
-        st.write(output)
-    st.session_state.messages.append({"role": "assistant", "content": output})
+        #output = run_llm(client, st.session_state.messages)
+        success, output = api_call("post", f"{config.API_URL}:{config.API_PORT}/chat", json={
+            "provider": st.session_state.provider,
+            "model_name": st.session_state.model_name,
+            "messages": st.session_state.messages})
+        answer = output["message"]
+        if success:
+            st.write(answer)
+    st.session_state.messages.append({"role": "assistant", "content": answer})

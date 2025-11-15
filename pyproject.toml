@@ -5,6 +5,7 @@ description = "Project App for the Maven AI Engineering Cohort Bootcamp"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.121.2",
     "google-genai>=1.50.1",
     "groq>=0.34.1",
     "ipykernel>=7.1.0",
@@ -12,4 +13,5 @@ dependencies = [
     "pydantic>=2.12.4",
     "pydantic-settings>=2.12.0",
     "streamlit>=1.51.0",
+    "uvicorn>=0.38.0",
 ]
